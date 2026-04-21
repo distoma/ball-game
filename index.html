@@ -63,6 +63,32 @@
     letter-spacing: 2px;
   }
 
+  /* Connection status */
+  .conn-status {
+    text-align: center;
+    padding: 8px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    background: rgba(255,255,255,0.7);
+  }
+  .conn-status.online { color: #059669; }
+  .conn-status.offline { color: #dc2626; }
+  .conn-status .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+    animation: pulse 2s infinite;
+  }
+  .conn-status.online .dot { background: #059669; }
+  .conn-status.offline .dot { background: #dc2626; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
   /* Start Screen */
   .start-screen {
     background: var(--panel);
@@ -192,6 +218,17 @@
   .btn-danger:active {
     transform: translateY(2px);
     box-shadow: 0 2px 0 #b91c1c;
+  }
+
+  .btn-secondary {
+    background: linear-gradient(135deg, #0891b2, #06b6d4);
+    color: white;
+    box-shadow: 0 4px 0 #0e7490, 0 6px 10px rgba(0,0,0,0.15);
+  }
+
+  .btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #0e7490, 0 8px 15px rgba(0,0,0,0.2);
   }
 
   /* Game Screen */
@@ -354,6 +391,15 @@
     font-weight: bold;
   }
 
+  .ranking tr.new {
+    animation: flashNew 1.5s ease;
+  }
+  @keyframes flashNew {
+    0% { background: #fef3c7; }
+    50% { background: #fde68a; }
+    100% { background: transparent; }
+  }
+
   .rank-badge {
     display: inline-block;
     width: 30px;
@@ -374,6 +420,43 @@
     justify-content: center;
     flex-wrap: wrap;
     margin-top: 15px;
+  }
+
+  .empty-ranking {
+    text-align: center;
+    padding: 30px;
+    color: #9ca3af;
+  }
+
+  /* Live leaderboard on start screen */
+  .live-board {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 12px;
+    border: 2px solid #d97706;
+  }
+
+  .live-board h3 {
+    color: #b45309;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+  }
+
+  .live-board .mini-ranking {
+    max-height: 200px;
+    overflow-y: auto;
+    text-align: left;
+  }
+
+  .mini-ranking .mini-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 10px;
+    margin: 3px 0;
+    background: white;
+    border-radius: 8px;
+    font-size: 0.95rem;
   }
 
   /* Animations */
@@ -401,6 +484,13 @@
     animation: pop 0.9s ease-out;
   }
 
+  .loading {
+    text-align: center;
+    padding: 20px;
+    color: #6b7280;
+    font-style: italic;
+  }
+
   @media (max-width: 600px) {
     h1 { font-size: 1.8rem; }
     .hud-value { font-size: 1.3rem; }
@@ -413,6 +503,11 @@
 
 <div class="container">
   <h1>🎯 공 넣기 챌린지 🎯</h1>
+
+  <!-- Connection Status -->
+  <div class="conn-status" id="connStatus">
+    <span class="dot"></span><span id="connText">서버 연결 중...</span>
+  </div>
 
   <!-- Start Screen -->
   <div class="start-screen" id="startScreen">
@@ -435,6 +530,14 @@
     </div>
 
     <button class="btn-primary" onclick="startGame()">🚀 게임 시작!</button>
+
+    <!-- Live Leaderboard -->
+    <div class="live-board">
+      <h3>🏆 실시간 TOP 10</h3>
+      <div class="mini-ranking" id="liveMiniRanking">
+        <div class="loading">기록을 불러오는 중...</div>
+      </div>
+    </div>
   </div>
 
   <!-- Game Screen -->
@@ -472,9 +575,10 @@
       <div>플레이어: <strong id="resultName"></strong></div>
       <div class="big"><span id="resultScore">0</span>점</div>
       <div>걸린 시간: <span id="resultTime">0.0</span>초</div>
+      <div id="saveStatus" style="margin-top:10px; font-size:0.9rem; color:#6b7280;">기록 저장 중...</div>
     </div>
 
-    <h3 style="color:#b45309; margin-top:20px;">📊 전체 등수</h3>
+    <h3 style="color:#b45309; margin-top:20px;">📊 전체 등수 (실시간)</h3>
     <div class="ranking">
       <table>
         <thead>
@@ -496,13 +600,96 @@
   </div>
 </div>
 
+<!-- ============ Firebase (Module) ============ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+
+  // ⭐ Your Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCPxiiWp_hsdv4-SsNZG3Z6bj2C0s1mD3M",
+    authDomain: "ball-game-ba82e.firebaseapp.com",
+    projectId: "ball-game-ba82e",
+    storageBucket: "ball-game-ba82e.firebasestorage.app",
+    messagingSenderId: "665226354845",
+    appId: "1:665226354845:web:cd0ff992654a35ac02b474"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const scoresRef = collection(db, "scores");
+
+  // Expose Firebase to global scope for game code to use
+  window.firebaseDB = {
+    async saveScore(name, score, time) {
+      try {
+        await addDoc(scoresRef, {
+          name: name,
+          score: score,
+          time: time,
+          createdAt: serverTimestamp()
+        });
+        return true;
+      } catch (e) {
+        console.error("저장 실패:", e);
+        return false;
+      }
+    },
+    subscribeToRanking(callback, topN = 50) {
+      // Order by score desc, then time asc
+      const q = query(scoresRef, orderBy("score", "desc"), limit(topN));
+      return onSnapshot(q, (snapshot) => {
+        const records = [];
+        snapshot.forEach(doc => {
+          records.push({ id: doc.id, ...doc.data() });
+        });
+        // Sort secondary by time (ascending) since Firestore can't compound without index
+        records.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return (a.time || 0) - (b.time || 0);
+        });
+        callback(records);
+      }, (error) => {
+        console.error("실시간 구독 오류:", error);
+        callback(null, error);
+      });
+    }
+  };
+
+  // Connection status handling
+  window.addEventListener('online', () => updateConnStatus(true));
+  window.addEventListener('offline', () => updateConnStatus(false));
+
+  function updateConnStatus(online) {
+    const el = document.getElementById('connStatus');
+    const txt = document.getElementById('connText');
+    if (online) {
+      el.className = 'conn-status online';
+      txt.textContent = '✅ 서버 연결됨 — 실시간 순위 활성화';
+    } else {
+      el.className = 'conn-status offline';
+      txt.textContent = '⚠️ 오프라인 — 로컬 순위만 저장됩니다';
+    }
+  }
+  // Set initial status
+  updateConnStatus(navigator.onLine);
+
+  // Start live subscription as soon as possible
+  window.addEventListener('DOMContentLoaded', () => {
+    if (window.initLiveRanking) window.initLiveRanking();
+  });
+</script>
+
+<!-- ============ Game Script ============ -->
 <script>
   // ============ Game Configuration ============
-  const GRID_SIZE = 10;            // 10 x 10 grid => 11 x 11 intersections
-  const INTERSECTIONS = GRID_SIZE + 1; // 11
+  const GRID_SIZE = 10;
+  const INTERSECTIONS = GRID_SIZE + 1;
   const TOTAL_BALLS = 20;
   const MAX_SCORE_PER_BALL = 1000;
-  const TIME_PENALTY = 100;        // points lost per second (per ball)
+  const TIME_PENALTY = 100;
 
   // ============ State ============
   let canvas, ctx;
@@ -521,15 +708,15 @@
   let isPlaying = false;
   let particles = [];
 
-  // Ranking storage (persists across plays this session)
-  let ranking = [];
+  // Online ranking data
+  let globalRanking = [];
+  let currentPlayerDocId = null; // to highlight own entry after saving
+  let unsubscribeRanking = null;
 
   // ============ Init Canvas ============
   function initCanvas() {
     canvas = document.getElementById('gameCanvas');
     ctx = canvas.getContext('2d');
-
-    // Adjust canvas size for mobile
     const maxW = Math.min(window.innerWidth - 60, 560);
     canvas.width = maxW;
     canvas.height = maxW;
@@ -538,11 +725,9 @@
 
   // ============ Drawing ============
   function draw() {
-    // Background
     ctx.fillStyle = '#fffbeb';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Subtle paper texture (vignette)
     const grad = ctx.createRadialGradient(
       canvas.width/2, canvas.height/2, canvas.width*0.2,
       canvas.width/2, canvas.height/2, canvas.width*0.7
@@ -564,21 +749,16 @@
 
     for (let i = 0; i <= GRID_SIZE; i++) {
       const pos = padding + i * cellSize;
-
-      // Vertical
       ctx.beginPath();
       ctx.moveTo(pos, padding);
       ctx.lineTo(pos, padding + GRID_SIZE * cellSize);
       ctx.stroke();
-
-      // Horizontal
       ctx.beginPath();
       ctx.moveTo(padding, pos);
       ctx.lineTo(padding + GRID_SIZE * cellSize, pos);
       ctx.stroke();
     }
 
-    // Draw intersection dots (subtle)
     ctx.fillStyle = 'rgba(180, 83, 9, 0.4)';
     for (let i = 0; i <= GRID_SIZE; i++) {
       for (let j = 0; j <= GRID_SIZE; j++) {
@@ -590,7 +770,6 @@
       }
     }
 
-    // Emphasize corners of board (traditional baduk marker dots)
     const markerPoints = [
       [2, 2], [GRID_SIZE-2, 2],
       [2, GRID_SIZE-2], [GRID_SIZE-2, GRID_SIZE-2],
@@ -611,7 +790,6 @@
     const y = padding + holeY * cellSize;
     const r = cellSize * 0.35;
 
-    // Outer glow (pulsing)
     const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
     const glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 1.8);
     glow.addColorStop(0, `rgba(251, 191, 36, ${0.5 * pulse})`);
@@ -621,7 +799,6 @@
     ctx.arc(x, y, r * 1.8, 0, Math.PI * 2);
     ctx.fill();
 
-    // Hole (dark void)
     const holeGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
     holeGrad.addColorStop(0, '#000');
     holeGrad.addColorStop(0.7, '#1f2937');
@@ -631,7 +808,6 @@
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Hole rim
     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -642,13 +818,11 @@
     const y = padding + ballY * cellSize;
     const r = cellSize * 0.32;
 
-    // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
     ctx.ellipse(x + 2, y + 4, r * 0.9, r * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Ball body
     const ballGrad = ctx.createRadialGradient(
       x - r * 0.3, y - r * 0.3, r * 0.1,
       x, y, r
@@ -661,7 +835,6 @@
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Shine
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.beginPath();
     ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2);
@@ -728,7 +901,6 @@
 
   function checkHole() {
     if (ballX === holeX && ballY === holeY) {
-      // Score calculation: faster = more points
       const ballTime = (Date.now() - ballStartTime) / 1000;
       const points = Math.max(100, Math.round(MAX_SCORE_PER_BALL - ballTime * TIME_PENALTY));
       score += points;
@@ -763,6 +935,66 @@
     }
   }
 
+  // ============ Live Ranking (Firebase) ============
+  window.initLiveRanking = function() {
+    if (!window.firebaseDB) {
+      setTimeout(() => window.initLiveRanking(), 100);
+      return;
+    }
+
+    // Subscribe to top 50
+    unsubscribeRanking = window.firebaseDB.subscribeToRanking((records, err) => {
+      if (err) {
+        document.getElementById('liveMiniRanking').innerHTML =
+          '<div class="loading" style="color:#dc2626;">⚠️ 순위 불러오기 실패. Firestore 규칙을 확인하세요.</div>';
+        return;
+      }
+      globalRanking = records || [];
+      renderLiveMiniBoard();
+      // If result screen is showing, update it too
+      if (document.getElementById('resultScreen').style.display === 'block') {
+        renderFullRanking();
+      }
+    });
+  };
+
+  function renderLiveMiniBoard() {
+    const el = document.getElementById('liveMiniRanking');
+    if (globalRanking.length === 0) {
+      el.innerHTML = '<div class="loading">아직 기록이 없어요. 첫 도전자가 되어보세요! 🎯</div>';
+      return;
+    }
+    const top10 = globalRanking.slice(0, 10);
+    el.innerHTML = top10.map((r, i) => {
+      const rank = i + 1;
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+      return `<div class="mini-row">
+        <span><strong>${medal}</strong> ${escapeHtml(r.name)}</span>
+        <span>${r.score}점 · ${(r.time || 0).toFixed(1)}초</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderFullRanking() {
+    const tbody = document.getElementById('rankingBody');
+    if (globalRanking.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-ranking">아직 기록이 없어요!</td></tr>';
+      return;
+    }
+    tbody.innerHTML = globalRanking.map((r, idx) => {
+      const rank = idx + 1;
+      const badgeClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+      const isYou = r.id === currentPlayerDocId;
+      return `<tr class="${isYou ? 'you' : ''}">
+        <td><span class="rank-badge ${badgeClass}">${rank}</span> ${medal}</td>
+        <td>${escapeHtml(r.name)}${isYou ? ' 👈' : ''}</td>
+        <td><strong>${r.score}</strong>점</td>
+        <td>${(r.time || 0).toFixed(1)}초</td>
+      </tr>`;
+    }).join('');
+  }
+
   // ============ Flow Control ============
   function startGame() {
     const nameInput = document.getElementById('playerName');
@@ -784,6 +1016,7 @@
     score = 0;
     currentBallNumber = 1;
     particles = [];
+    currentPlayerDocId = null;
     document.getElementById('score').textContent = 0;
     document.getElementById('ballCount').textContent = 1;
     document.getElementById('time').textContent = '0.0';
@@ -791,7 +1024,6 @@
     resetBallPosition();
     placeNewHole();
 
-    // Countdown
     showCountdown(3, () => {
       isPlaying = true;
       gameStartTime = Date.now();
@@ -825,63 +1057,38 @@
     }, 800);
   }
 
-  function finishGame() {
+  async function finishGame() {
     isPlaying = false;
     clearInterval(timerInterval);
     const finalTime = (Date.now() - gameStartTime) / 1000;
 
-    // Add to ranking
-    ranking.push({
-      name: playerName,
-      score: score,
-      time: finalTime,
-      isCurrent: true
-    });
-
-    // Clear previous "isCurrent" flags
-    ranking.forEach((r, i) => {
-      if (i !== ranking.length - 1) r.isCurrent = false;
-    });
-
-    // Sort by score desc, then time asc
-    ranking.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.time - b.time;
-    });
-
-    showResult(finalTime);
-  }
-
-  function showResult(finalTime) {
     document.getElementById('gameScreen').style.display = 'none';
     document.getElementById('resultScreen').style.display = 'block';
     document.getElementById('resultName').textContent = playerName;
     document.getElementById('resultScore').textContent = score;
     document.getElementById('resultTime').textContent = finalTime.toFixed(1);
 
-    const tbody = document.getElementById('rankingBody');
-    tbody.innerHTML = '';
-    ranking.forEach((r, idx) => {
-      const rank = idx + 1;
-      const badgeClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+    const statusEl = document.getElementById('saveStatus');
+    statusEl.textContent = '💾 기록 저장 중...';
+    statusEl.style.color = '#6b7280';
 
-      const tr = document.createElement('tr');
-      if (r.isCurrent) tr.className = 'you';
-      tr.innerHTML = `
-        <td><span class="rank-badge ${badgeClass}">${rank}</span> ${medal}</td>
-        <td>${escapeHtml(r.name)}${r.isCurrent ? ' 👈' : ''}</td>
-        <td><strong>${r.score}</strong>점</td>
-        <td>${r.time.toFixed(1)}초</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
+    // Save to Firebase
+    if (window.firebaseDB && navigator.onLine) {
+      const success = await window.firebaseDB.saveScore(playerName, score, finalTime);
+      if (success) {
+        statusEl.textContent = '✅ 기록 저장 완료! 실시간으로 순위에 반영됩니다.';
+        statusEl.style.color = '#059669';
+      } else {
+        statusEl.textContent = '⚠️ 저장 실패. 네트워크를 확인해주세요.';
+        statusEl.style.color = '#dc2626';
+      }
+    } else {
+      statusEl.textContent = '⚠️ 오프라인 상태 — 기록이 저장되지 않았습니다.';
+      statusEl.style.color = '#dc2626';
+    }
 
-  function escapeHtml(s) {
-    return s.replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[c]);
+    // Render current ranking (will update live via subscription)
+    renderFullRanking();
   }
 
   function restartGame() {
@@ -892,9 +1099,7 @@
   }
 
   function endGame() {
-    document.getElementById('resultScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'none';
-    document.getElementById('startScreen').style.display = 'block';
+    if (unsubscribeRanking) unsubscribeRanking();
     document.body.innerHTML = `
       <div style="min-height:100vh; display:flex; flex-direction:column;
                   align-items:center; justify-content:center;
@@ -908,6 +1113,17 @@
     document.body.style.background = 'linear-gradient(135deg, #fef3c7, #fde68a)';
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+  // Expose to onclick handlers
+  window.startGame = startGame;
+  window.restartGame = restartGame;
+  window.endGame = endGame;
+
   // ============ Keyboard Input ============
   document.addEventListener('keydown', (e) => {
     if (!isPlaying) return;
@@ -919,12 +1135,10 @@
     }
   });
 
-  // Allow Enter key in start screen
   document.getElementById('playerName').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startGame();
   });
 
-  // Handle resize
   window.addEventListener('resize', () => {
     if (isPlaying || document.getElementById('gameScreen').style.display === 'block') {
       initCanvas();
@@ -932,7 +1146,6 @@
     }
   });
 
-  // Auto focus name input
   window.addEventListener('load', () => {
     document.getElementById('playerName').focus();
   });
