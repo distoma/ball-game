@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공 넣기 게임 🎯</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Jua&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-1: #fef3c7;
+    --bg-2: #fde68a;
+    --board-bg: #fffbeb;
+    --line: #d97706;
+    --ball: #ef4444;
+    --ball-shine: #fecaca;
+    --hole: #1f2937;
+    --hole-glow: #fbbf24;
+    --accent: #059669;
+    --accent-2: #0891b2;
+    --text: #1f2937;
+    --panel: rgba(255, 255, 255, 0.85);
+  }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 100%);
+    font-family: 'Jua', 'Fredoka', sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(251, 191, 36, 0.25) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 700px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 2.5rem;
+    color: #b45309;
+    text-shadow: 3px 3px 0px #fff, 6px 6px 0px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    letter-spacing: 2px;
+  }
+
+  /* Start Screen */
+  .start-screen {
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    border: 4px solid #b45309;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    text-align: center;
+  }
+
+  .start-screen h2 {
+    font-size: 1.8rem;
+    color: #b45309;
+    margin-bottom: 20px;
+  }
+
+  .start-screen p {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    margin-bottom: 15px;
+    color: #4b5563;
+  }
+
+  .rules {
+    background: #fef3c7;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: left;
+    border: 2px dashed #d97706;
+  }
+
+  .rules h3 {
+    color: #b45309;
+    margin-bottom: 10px;
+    font-size: 1.3rem;
+  }
+
+  .rules ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .rules li {
+    padding: 5px 0;
+    font-size: 1rem;
+    color: #4b5563;
+  }
+
+  .rules li::before {
+    content: '🎯 ';
+    margin-right: 5px;
+  }
+
+  .input-group {
+    margin: 20px 0;
+  }
+
+  .input-group label {
+    display: block;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: #b45309;
+    font-weight: bold;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 1.2rem;
+    font-family: inherit;
+    border: 3px solid #d97706;
+    border-radius: 12px;
+    outline: none;
+    text-align: center;
+    background: white;
+    transition: all 0.2s;
+  }
+
+  input[type="text"]:focus {
+    border-color: #059669;
+    transform: scale(1.02);
+    box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.2);
+  }
+
+  button {
+    font-family: 'Jua', sans-serif;
+    font-size: 1.2rem;
+    padding: 14px 32px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin: 8px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: white;
+    box-shadow: 0 4px 0 #047857, 0 6px 10px rgba(0,0,0,0.15);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #047857, 0 8px 15px rgba(0,0,0,0.2);
+  }
+
+  .btn-primary:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #047857;
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #ef4444, #f87171);
+    color: white;
+    box-shadow: 0 4px 0 #b91c1c, 0 6px 10px rgba(0,0,0,0.15);
+  }
+
+  .btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #b91c1c, 0 8px 15px rgba(0,0,0,0.2);
+  }
+
+  .btn-danger:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #b91c1c;
+  }
+
+  /* Game Screen */
+  .game-screen {
+    display: none;
+  }
+
+  .hud {
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    border: 3px solid #b45309;
+    border-radius: 15px;
+    padding: 15px 20px;
+    margin-bottom: 15px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  }
+
+  .hud-item {
+    text-align: center;
+    padding: 8px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.5);
+  }
+
+  .hud-label {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .hud-value {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: #b45309;
+  }
+
+  .hud-item.score .hud-value { color: #059669; }
+  .hud-item.time .hud-value { color: #dc2626; }
+
+  #player-name-display {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #b45309;
+    margin-bottom: 10px;
+    background: rgba(255,255,255,0.6);
+    padding: 6px;
+    border-radius: 10px;
+  }
+
+  /* Canvas */
+  .canvas-wrapper {
+    background: var(--board-bg);
+    border: 5px solid #b45309;
+    border-radius: 15px;
+    padding: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    display: flex;
+    justify-content: center;
+  }
+
+  canvas {
+    display: block;
+    background: var(--board-bg);
+    border-radius: 8px;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .hint {
+    text-align: center;
+    margin-top: 15px;
+    color: #6b7280;
+    font-size: 1rem;
+  }
+
+  .hint kbd {
+    background: white;
+    border: 2px solid #b45309;
+    border-bottom: 4px solid #b45309;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: inherit;
+    color: #b45309;
+    font-size: 0.9rem;
+    margin: 0 2px;
+  }
+
+  /* Result Screen */
+  .result-screen {
+    display: none;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    border: 4px solid #b45309;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    text-align: center;
+  }
+
+  .result-screen h2 {
+    font-size: 2.2rem;
+    color: #b45309;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 0 white;
+  }
+
+  .your-result {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 3px solid #d97706;
+  }
+
+  .your-result .big {
+    font-size: 2.5rem;
+    color: #059669;
+    font-weight: bold;
+    margin: 10px 0;
+  }
+
+  .ranking {
+    max-height: 400px;
+    overflow-y: auto;
+    margin: 20px 0;
+    border-radius: 12px;
+    background: white;
+    border: 2px solid #d97706;
+  }
+
+  .ranking table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .ranking th {
+    background: #b45309;
+    color: white;
+    padding: 12px;
+    font-size: 1.1rem;
+    position: sticky;
+    top: 0;
+  }
+
+  .ranking td {
+    padding: 10px;
+    border-bottom: 1px solid #fde68a;
+    font-size: 1.05rem;
+  }
+
+  .ranking tr:hover {
+    background: #fef3c7;
+  }
+
+  .ranking tr.you {
+    background: #d1fae5 !important;
+    font-weight: bold;
+  }
+
+  .rank-badge {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+  }
+
+  .rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); box-shadow: 0 0 10px rgba(251,191,36,0.5); }
+  .rank-2 { background: linear-gradient(135deg, #94a3b8, #64748b); }
+  .rank-3 { background: linear-gradient(135deg, #f97316, #ea580c); }
+  .rank-other { background: #9ca3af; }
+
+  .button-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 15px;
+  }
+
+  /* Animations */
+  @keyframes pop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  .countdown {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 8rem;
+    color: #b45309;
+    text-shadow: 4px 4px 0 white, 8px 8px 20px rgba(0,0,0,0.3);
+    z-index: 1000;
+    animation: pop 0.9s ease-out;
+  }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 1.8rem; }
+    .hud-value { font-size: 1.3rem; }
+    .hud-label { font-size: 0.75rem; }
+    .start-screen, .result-screen { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🎯 공 넣기 챌린지 🎯</h1>
+
+  <!-- Start Screen -->
+  <div class="start-screen" id="startScreen">
+    <h2>🎮 게임 시작</h2>
+    <p>바둑판 위에서 공을 움직여<br>구멍에 넣는 스피드 게임!</p>
+
+    <div class="rules">
+      <h3>📋 게임 규칙</h3>
+      <ul>
+        <li>방향키로 공을 한 칸씩 이동</li>
+        <li>검은 구멍에 공을 넣기</li>
+        <li>총 20개의 공을 넣기</li>
+        <li>빠르게 넣을수록 높은 점수!</li>
+      </ul>
+    </div>
+
+    <div class="input-group">
+      <label for="playerName">✏️ 이름을 입력하세요</label>
+      <input type="text" id="playerName" maxlength="10" placeholder="이름 (최대 10자)">
+    </div>
+
+    <button class="btn-primary" onclick="startGame()">🚀 게임 시작!</button>
+  </div>
+
+  <!-- Game Screen -->
+  <div class="game-screen" id="gameScreen">
+    <div id="player-name-display">플레이어: <span id="currentPlayer"></span></div>
+    <div class="hud">
+      <div class="hud-item">
+        <div class="hud-label">🎱 공</div>
+        <div class="hud-value"><span id="ballCount">1</span>/20</div>
+      </div>
+      <div class="hud-item score">
+        <div class="hud-label">⭐ 점수</div>
+        <div class="hud-value" id="score">0</div>
+      </div>
+      <div class="hud-item time">
+        <div class="hud-label">⏱️ 시간</div>
+        <div class="hud-value" id="time">0.0</div>
+      </div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas" width="560" height="560"></canvas>
+    </div>
+
+    <div class="hint">
+      <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 방향키로 공을 움직이세요
+    </div>
+  </div>
+
+  <!-- Result Screen -->
+  <div class="result-screen" id="resultScreen">
+    <h2>🏆 게임 결과 🏆</h2>
+
+    <div class="your-result">
+      <div>플레이어: <strong id="resultName"></strong></div>
+      <div class="big"><span id="resultScore">0</span>점</div>
+      <div>걸린 시간: <span id="resultTime">0.0</span>초</div>
+    </div>
+
+    <h3 style="color:#b45309; margin-top:20px;">📊 전체 등수</h3>
+    <div class="ranking">
+      <table>
+        <thead>
+          <tr>
+            <th>등수</th>
+            <th>이름</th>
+            <th>점수</th>
+            <th>시간</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-primary" onclick="restartGame()">🔄 새롭게 도전하기</button>
+      <button class="btn-danger" onclick="endGame()">🚪 끝내기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============ Game Configuration ============
+  const GRID_SIZE = 10;            // 10 x 10 grid => 11 x 11 intersections
+  const INTERSECTIONS = GRID_SIZE + 1; // 11
+  const TOTAL_BALLS = 20;
+  const MAX_SCORE_PER_BALL = 1000;
+  const TIME_PENALTY = 100;        // points lost per second (per ball)
+
+  // ============ State ============
+  let canvas, ctx;
+  let cellSize = 50;
+  let padding = 30;
+
+  let playerName = '';
+  let ballX, ballY;
+  let holeX, holeY;
+  let currentBallNumber = 1;
+  let score = 0;
+  let ballStartTime = 0;
+  let gameStartTime = 0;
+  let elapsedTime = 0;
+  let timerInterval = null;
+  let isPlaying = false;
+  let particles = [];
+
+  // Ranking storage (persists across plays this session)
+  let ranking = [];
+
+  // ============ Init Canvas ============
+  function initCanvas() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+
+    // Adjust canvas size for mobile
+    const maxW = Math.min(window.innerWidth - 60, 560);
+    canvas.width = maxW;
+    canvas.height = maxW;
+    cellSize = (canvas.width - padding * 2) / GRID_SIZE;
+  }
+
+  // ============ Drawing ============
+  function draw() {
+    // Background
+    ctx.fillStyle = '#fffbeb';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Subtle paper texture (vignette)
+    const grad = ctx.createRadialGradient(
+      canvas.width/2, canvas.height/2, canvas.width*0.2,
+      canvas.width/2, canvas.height/2, canvas.width*0.7
+    );
+    grad.addColorStop(0, 'rgba(251, 191, 36, 0)');
+    grad.addColorStop(1, 'rgba(180, 83, 9, 0.08)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawBoard();
+    drawHole();
+    drawBall();
+    drawParticles();
+  }
+
+  function drawBoard() {
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.5;
+
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      const pos = padding + i * cellSize;
+
+      // Vertical
+      ctx.beginPath();
+      ctx.moveTo(pos, padding);
+      ctx.lineTo(pos, padding + GRID_SIZE * cellSize);
+      ctx.stroke();
+
+      // Horizontal
+      ctx.beginPath();
+      ctx.moveTo(padding, pos);
+      ctx.lineTo(padding + GRID_SIZE * cellSize, pos);
+      ctx.stroke();
+    }
+
+    // Draw intersection dots (subtle)
+    ctx.fillStyle = 'rgba(180, 83, 9, 0.4)';
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      for (let j = 0; j <= GRID_SIZE; j++) {
+        const x = padding + i * cellSize;
+        const y = padding + j * cellSize;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Emphasize corners of board (traditional baduk marker dots)
+    const markerPoints = [
+      [2, 2], [GRID_SIZE-2, 2],
+      [2, GRID_SIZE-2], [GRID_SIZE-2, GRID_SIZE-2],
+      [GRID_SIZE/2, GRID_SIZE/2]
+    ];
+    ctx.fillStyle = '#b45309';
+    markerPoints.forEach(([i, j]) => {
+      const x = padding + i * cellSize;
+      const y = padding + j * cellSize;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawHole() {
+    const x = padding + holeX * cellSize;
+    const y = padding + holeY * cellSize;
+    const r = cellSize * 0.35;
+
+    // Outer glow (pulsing)
+    const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+    const glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 1.8);
+    glow.addColorStop(0, `rgba(251, 191, 36, ${0.5 * pulse})`);
+    glow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hole (dark void)
+    const holeGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    holeGrad.addColorStop(0, '#000');
+    holeGrad.addColorStop(0.7, '#1f2937');
+    holeGrad.addColorStop(1, '#374151');
+    ctx.fillStyle = holeGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hole rim
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawBall() {
+    const x = padding + ballX * cellSize;
+    const y = padding + ballY * cellSize;
+    const r = cellSize * 0.32;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(x + 2, y + 4, r * 0.9, r * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball body
+    const ballGrad = ctx.createRadialGradient(
+      x - r * 0.3, y - r * 0.3, r * 0.1,
+      x, y, r
+    );
+    ballGrad.addColorStop(0, '#fecaca');
+    ballGrad.addColorStop(0.4, '#ef4444');
+    ballGrad.addColorStop(1, '#991b1b');
+    ctx.fillStyle = ballGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawParticles() {
+    particles = particles.filter(p => p.life > 0);
+    particles.forEach(p => {
+      ctx.fillStyle = `rgba(${p.color}, ${p.life / p.maxLife})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
+      ctx.fill();
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.2;
+      p.life--;
+    });
+  }
+
+  function spawnParticles(gridX, gridY) {
+    const x = padding + gridX * cellSize;
+    const y = padding + gridY * cellSize;
+    const colors = ['251, 191, 36', '239, 68, 68', '5, 150, 105', '14, 165, 233'];
+    for (let i = 0; i < 20; i++) {
+      particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 8,
+        vy: (Math.random() - 0.5) * 8 - 2,
+        size: Math.random() * 4 + 2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 40 + Math.random() * 20,
+        maxLife: 60
+      });
+    }
+  }
+
+  // ============ Game Logic ============
+  function placeNewHole() {
+    let nx, ny;
+    do {
+      nx = Math.floor(Math.random() * INTERSECTIONS);
+      ny = Math.floor(Math.random() * INTERSECTIONS);
+    } while (nx === ballX && ny === ballY);
+    holeX = nx;
+    holeY = ny;
+  }
+
+  function resetBallPosition() {
+    ballX = Math.floor(INTERSECTIONS / 2);
+    ballY = Math.floor(INTERSECTIONS / 2);
+  }
+
+  function moveBall(dx, dy) {
+    if (!isPlaying) return;
+    const newX = ballX + dx;
+    const newY = ballY + dy;
+    if (newX >= 0 && newX < INTERSECTIONS && newY >= 0 && newY < INTERSECTIONS) {
+      ballX = newX;
+      ballY = newY;
+      checkHole();
+    }
+  }
+
+  function checkHole() {
+    if (ballX === holeX && ballY === holeY) {
+      // Score calculation: faster = more points
+      const ballTime = (Date.now() - ballStartTime) / 1000;
+      const points = Math.max(100, Math.round(MAX_SCORE_PER_BALL - ballTime * TIME_PENALTY));
+      score += points;
+      document.getElementById('score').textContent = score;
+
+      spawnParticles(holeX, holeY);
+
+      if (currentBallNumber >= TOTAL_BALLS) {
+        finishGame();
+      } else {
+        currentBallNumber++;
+        document.getElementById('ballCount').textContent = currentBallNumber;
+        resetBallPosition();
+        placeNewHole();
+        ballStartTime = Date.now();
+      }
+    }
+  }
+
+  function updateTimer() {
+    elapsedTime = (Date.now() - gameStartTime) / 1000;
+    document.getElementById('time').textContent = elapsedTime.toFixed(1);
+  }
+
+  function gameLoop() {
+    if (isPlaying) {
+      draw();
+      requestAnimationFrame(gameLoop);
+    } else if (particles.length > 0) {
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+  }
+
+  // ============ Flow Control ============
+  function startGame() {
+    const nameInput = document.getElementById('playerName');
+    playerName = nameInput.value.trim();
+    if (!playerName) {
+      nameInput.style.animation = 'shake 0.4s';
+      nameInput.focus();
+      setTimeout(() => nameInput.style.animation = '', 500);
+      return;
+    }
+
+    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('resultScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'block';
+    document.getElementById('currentPlayer').textContent = playerName;
+
+    initCanvas();
+
+    score = 0;
+    currentBallNumber = 1;
+    particles = [];
+    document.getElementById('score').textContent = 0;
+    document.getElementById('ballCount').textContent = 1;
+    document.getElementById('time').textContent = '0.0';
+
+    resetBallPosition();
+    placeNewHole();
+
+    // Countdown
+    showCountdown(3, () => {
+      isPlaying = true;
+      gameStartTime = Date.now();
+      ballStartTime = Date.now();
+      timerInterval = setInterval(updateTimer, 100);
+      gameLoop();
+    });
+
+    draw();
+  }
+
+  function showCountdown(n, cb) {
+    const el = document.createElement('div');
+    el.className = 'countdown';
+    el.textContent = n;
+    document.body.appendChild(el);
+    setTimeout(() => {
+      el.remove();
+      if (n > 1) showCountdown(n - 1, cb);
+      else {
+        const go = document.createElement('div');
+        go.className = 'countdown';
+        go.textContent = 'GO!';
+        go.style.color = '#059669';
+        document.body.appendChild(go);
+        setTimeout(() => {
+          go.remove();
+          cb();
+        }, 600);
+      }
+    }, 800);
+  }
+
+  function finishGame() {
+    isPlaying = false;
+    clearInterval(timerInterval);
+    const finalTime = (Date.now() - gameStartTime) / 1000;
+
+    // Add to ranking
+    ranking.push({
+      name: playerName,
+      score: score,
+      time: finalTime,
+      isCurrent: true
+    });
+
+    // Clear previous "isCurrent" flags
+    ranking.forEach((r, i) => {
+      if (i !== ranking.length - 1) r.isCurrent = false;
+    });
+
+    // Sort by score desc, then time asc
+    ranking.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.time - b.time;
+    });
+
+    showResult(finalTime);
+  }
+
+  function showResult(finalTime) {
+    document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('resultScreen').style.display = 'block';
+    document.getElementById('resultName').textContent = playerName;
+    document.getElementById('resultScore').textContent = score;
+    document.getElementById('resultTime').textContent = finalTime.toFixed(1);
+
+    const tbody = document.getElementById('rankingBody');
+    tbody.innerHTML = '';
+    ranking.forEach((r, idx) => {
+      const rank = idx + 1;
+      const badgeClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+
+      const tr = document.createElement('tr');
+      if (r.isCurrent) tr.className = 'you';
+      tr.innerHTML = `
+        <td><span class="rank-badge ${badgeClass}">${rank}</span> ${medal}</td>
+        <td>${escapeHtml(r.name)}${r.isCurrent ? ' 👈' : ''}</td>
+        <td><strong>${r.score}</strong>점</td>
+        <td>${r.time.toFixed(1)}초</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+  function restartGame() {
+    document.getElementById('resultScreen').style.display = 'none';
+    document.getElementById('startScreen').style.display = 'block';
+    document.getElementById('playerName').value = '';
+    document.getElementById('playerName').focus();
+  }
+
+  function endGame() {
+    document.getElementById('resultScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('startScreen').style.display = 'block';
+    document.body.innerHTML = `
+      <div style="min-height:100vh; display:flex; flex-direction:column;
+                  align-items:center; justify-content:center;
+                  font-family:'Jua',sans-serif; color:#b45309; text-align:center; padding:20px;">
+        <h1 style="font-size:3rem; text-shadow: 3px 3px 0 white;">👋 수고하셨습니다!</h1>
+        <p style="font-size:1.3rem; margin-top:20px; color:#4b5563;">
+          게임을 종료했습니다.<br>창을 닫거나 새로고침하여 다시 시작할 수 있습니다.
+        </p>
+      </div>
+    `;
+    document.body.style.background = 'linear-gradient(135deg, #fef3c7, #fde68a)';
+  }
+
+  // ============ Keyboard Input ============
+  document.addEventListener('keydown', (e) => {
+    if (!isPlaying) return;
+    switch (e.key) {
+      case 'ArrowUp':    moveBall(0, -1); e.preventDefault(); break;
+      case 'ArrowDown':  moveBall(0, 1);  e.preventDefault(); break;
+      case 'ArrowLeft':  moveBall(-1, 0); e.preventDefault(); break;
+      case 'ArrowRight': moveBall(1, 0);  e.preventDefault(); break;
+    }
+  });
+
+  // Allow Enter key in start screen
+  document.getElementById('playerName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') startGame();
+  });
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+    if (isPlaying || document.getElementById('gameScreen').style.display === 'block') {
+      initCanvas();
+      draw();
+    }
+  });
+
+  // Auto focus name input
+  window.addEventListener('load', () => {
+    document.getElementById('playerName').focus();
+  });
+</script>
+
+</body>
+</html>
